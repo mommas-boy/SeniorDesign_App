@@ -3,7 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.example.bluetooth_test_androidstudio.MainActivity" >
     <item android:id="@+id/action_settings"
-        android:title="@string/action_settings"
+        android:title="@string/menu_settings"
         android:orderInCategory="100"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_refresh"
+        android:title="@string/menu_refresh"
         app:showAsAction="never" />
 </menu>
