@@ -22,6 +22,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
 
 public class ScanActivity extends AppCompatActivity {
 
@@ -32,10 +34,13 @@ public class ScanActivity extends AppCompatActivity {
 
     private LeDeviceListAdapter mLeDeviceListAdapter;
     private BluetoothAdapter mBluetoothAdapter;
-    private boolean mScanning;
+    private boolean mScanning = false;
+    private boolean bluetoothAccess = true;
+    private boolean locationAccess = true;
     private Handler mHandler;
 
     private static final int MY_PERMISSIONS_REQUEST_BLUETOOTH_ADMIN = 7;
+    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,37 +95,48 @@ public class ScanActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             // Permission is not granted
-
-            Toast.makeText(this, "No location", Toast.LENGTH_LONG).show();
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, MY_PERMISSIONS_REQUEST_BLUETOOTH_ADMIN);
+            locationAccess = false;
+            //Toast.makeText(this, "No location", Toast.LENGTH_LONG).show();
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         }
 
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN)
                 != PackageManager.PERMISSION_GRANTED) {
             // Permission is not granted
-
-            Toast.makeText(this, "No bluetooth admin", Toast.LENGTH_SHORT).show();
+            bluetoothAccess = false;
+            //Toast.makeText(this, "No bluetooth admin", Toast.LENGTH_LONG).show();
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_ADMIN}, MY_PERMISSIONS_REQUEST_BLUETOOTH_ADMIN);
         }
-        else {
-            scanLeDevice(true);
-        }
+        attemptScan();
     }
 
 
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_BLUETOOTH_ADMIN: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // permission was granted, yay! Do the
-                    // contacts-related task you need to do.
+                    // permission was granted
 
-                    scanLeDevice(true);
+                    bluetoothAccess = true;
+                    attemptScan();
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                }
+                return;
+            }
+            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted
+
+                    locationAccess = true;
+                    attemptScan();
                 } else {
                     // permission denied, boo! Disable the
                     // functionality that depends on this permission.
@@ -142,13 +158,23 @@ public class ScanActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
-            if(mScanning == false) {
-                scanLeDevice(true);
-            }
             return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void attemptScan() {
+        if(bluetoothAccess && locationAccess) {
+            scanLeDevice(true);
+        }
+    }
+
+    private void refreshList() {
+        if(mScanning) {
+            return;
+        }
+        attemptScan();
     }
 
 

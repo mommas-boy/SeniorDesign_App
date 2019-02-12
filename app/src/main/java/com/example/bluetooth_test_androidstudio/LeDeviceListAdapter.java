@@ -44,7 +44,9 @@ public class LeDeviceListAdapter extends ArrayAdapter {
 
 
     public void addDevice(BluetoothDevice device) {
-        deviceArray.add(device);
-        notifyDataSetChanged();
+        if(!deviceArray.contains(device)) {
+            deviceArray.add(device);
+            notifyDataSetChanged();
+        }
     }
 }
