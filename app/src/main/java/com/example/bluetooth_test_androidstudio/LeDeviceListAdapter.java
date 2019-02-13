@@ -11,6 +11,8 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 
+import androidx.annotation.Nullable;
+
 public class LeDeviceListAdapter extends ArrayAdapter {
 
     private ArrayList<BluetoothDevice> deviceArray = new ArrayList<BluetoothDevice>();
@@ -37,6 +39,12 @@ public class LeDeviceListAdapter extends ArrayAdapter {
         return convertView;
     }
 
+    @Nullable
+    @Override
+    public Object getItem(int position) {
+        return deviceArray.get(position);
+    }
+
     @Override
     public int getCount() {
         return deviceArray.size();
@@ -48,5 +56,10 @@ public class LeDeviceListAdapter extends ArrayAdapter {
             deviceArray.add(device);
             notifyDataSetChanged();
         }
+    }
+
+    public void resetList() {
+        deviceArray.clear();
+        notifyDataSetChanged();
     }
 }

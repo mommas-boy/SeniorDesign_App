@@ -13,6 +13,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
@@ -54,6 +55,27 @@ public class ScanActivity extends AppCompatActivity {
         ListView deviceList = (ListView) this.findViewById(R.id.device_list);
         deviceList.setAdapter(mLeDeviceListAdapter);
 
+        final SwipeRefreshLayout swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swiperefresh);
+        swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+                                      @Override
+                                      public void onRefresh() {
+                                          if(attemptScan()){
+                                              mLeDeviceListAdapter.resetList();
+
+                                              mHandler.postDelayed(new Runnable() {
+                                                  @Override
+                                                  public void run() {
+                                                      swipeRefresh.setRefreshing(false);
+                                                  }
+                                              }, SCAN_PERIOD);
+                                          }
+                                          else {
+                                              swipeRefresh.setRefreshing(false);
+                                          }
+
+                                      }
+                                  }
+        );
         // Use this check to determine whether BLE is supported on the device. Then
         // you can selectively disable BLE-related features.
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
@@ -158,16 +180,19 @@ public class ScanActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            Toast.makeText(this, "Wat", Toast.LENGTH_LONG).show();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    private void attemptScan() {
-        if(bluetoothAccess && locationAccess) {
+    private boolean attemptScan() {
+        if(bluetoothAccess && locationAccess && !mScanning) {
             scanLeDevice(true);
+            return true;
         }
+        return false;
     }
 
     private void refreshList() {
