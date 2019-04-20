@@ -4,6 +4,9 @@ import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -204,39 +207,41 @@ public class ScanActivity extends AppCompatActivity {
 
 
     private void scanLeDevice(final boolean enable) {
+        final BluetoothLeScanner leScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        if(leScanner == null)
+            return;
         if (enable) {
             // Stops scanning after a pre-defined scan period.
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     mScanning = false;
-                    mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                    leScanner.stopScan(mLeScanCallback);
                 }
             }, SCAN_PERIOD);
 
             mScanning = true;
-            mBluetoothAdapter.startLeScan(mLeScanCallback);
+            leScanner.startScan(mLeScanCallback);
         } else {
             mScanning = false;
-            mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            leScanner.stopScan(mLeScanCallback);
         }
         //Something needs to go here I think.
     }
 
     // Device scan callback.
-    private BluetoothAdapter.LeScanCallback mLeScanCallback =
-            new BluetoothAdapter.LeScanCallback() {
+    private ScanCallback mLeScanCallback =
+            new ScanCallback() {
                 @Override
-                public void onLeScan(final BluetoothDevice device, int rssi,
-                                     byte[] scanRecord) {
+                public void onScanResult(int callbackType, final ScanResult result) { //(final BluetoothDevice device, int rssi, byte[] scanRecord) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             //Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
-                            mLeDeviceListAdapter.addDevice(device);
+                            mLeDeviceListAdapter.addDevice(result.getDevice());
                             mLeDeviceListAdapter.notifyDataSetChanged();
                             TextView wat =  (TextView) findViewById(R.id.testBox);
-                            wat.setText("Found a device: " + device.getName());
+                            wat.setText("Found a device: " + result.getDevice().getName());
                         }
                     });
                 }
