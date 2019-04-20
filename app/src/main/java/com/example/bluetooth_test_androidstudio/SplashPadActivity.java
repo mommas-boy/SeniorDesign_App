@@ -8,20 +8,18 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.view.View;
-import android.widget.Button;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Toast;
 
 
 import static com.example.bluetooth_test_androidstudio.ScanActivity.BLUETOOTH_DEVICE_EXTRA;
 
-public class DevHelpActivity extends Activity {
+public class SplashPadActivity extends Activity {
 
     private BluetoothDevice mDevice = null;
     private SplashPadComService mService = null;
     private boolean mBound = false;
-
-    private Button allOnButton;
-    private Button centerOnlyButton;
 
 
     private ServiceConnection connection = new ServiceConnection() {
@@ -44,7 +42,7 @@ public class DevHelpActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_help_buttons);
+        setContentView(R.layout.activity_splashpad);
         Intent intent = getIntent();
         mDevice = intent.getParcelableExtra(BLUETOOTH_DEVICE_EXTRA);
 
@@ -55,10 +53,6 @@ public class DevHelpActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
-
-        if(mService != null) {
-            mService.connectToDevice(mDevice);
-        }
     }
 
     @Override
@@ -76,36 +70,33 @@ public class DevHelpActivity extends Activity {
         super.onDestroy();
     }
 
-    private void initializeViews() {
-        allOnButton = findViewById(R.id.all_on_button);
-        centerOnlyButton = findViewById(R.id.only_center_button);
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
 
-        allOnButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(mService != null) {
-                    for(int i = 0; i < 7; i++) {
-                        mService.turnOnNozzle(i);
-                    }
-                }
-            }
-        });
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
 
-        centerOnlyButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(mService != null) {
-                    for(int i = 0; i < 7; i++) {
-                        if (i == 3) {
-                            mService.turnOnNozzle(3);
-                        } else {
-                            mService.turnOffNozzle(i);
-                        }
-                    }
-                }
-            }
-        });
+        //noinspection SimplifiableIfStatement
+        switch(id) {
+            case R.id.action_settings:
+                Toast.makeText(this, "Wat", Toast.LENGTH_LONG).show();
+                return true;
+            case R.id.menu_dev_buttons:
+                Intent intent = new Intent(this, SplashPadActivity.class);
+                intent.putExtra(BLUETOOTH_DEVICE_EXTRA, mDevice);
+                startActivity(intent);
+                return true;
+            default:
+        }
 
-
+        return super.onOptionsItemSelected(item);
     }
 }

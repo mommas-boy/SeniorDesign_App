@@ -10,4 +10,8 @@
         android:id="@+id/menu_refresh"
         android:title="@string/menu_refresh"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_dev_buttons"
+        android:title="@string/menu_dev_buttons"
+        app:showAsAction="never" />
 </menu>

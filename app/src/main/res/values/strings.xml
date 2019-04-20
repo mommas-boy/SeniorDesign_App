@@ -3,4 +3,6 @@
     <string name="menu_settings">Settings</string>
     <string name="menu_refresh">Refresh List</string>
     <string name="ble_not_supported">This App will not function correctly.</string>
+
+    <string name="menu_dev_buttons">Dev Buttons</string>
 </resources>

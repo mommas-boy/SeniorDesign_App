@@ -1,6 +1,7 @@
 package com.example.bluetooth_test_androidstudio;
 
 import android.Manifest;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -12,24 +13,22 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 
 
-public class ScanActivity extends AppCompatActivity {
+public class ScanActivity extends Activity {
+
+    public static final String BLUETOOTH_DEVICE_EXTRA = "Bluetooth Device";
 
     public static int REQUEST_ENABLE_BT = 1;
 
@@ -58,6 +57,14 @@ public class ScanActivity extends AppCompatActivity {
         ListView deviceList = (ListView) this.findViewById(R.id.device_list);
         deviceList.setAdapter(mLeDeviceListAdapter);
 
+        deviceList.setOnItemClickListener(new ListView.OnItemClickListener(){
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                BluetoothDevice device = (BluetoothDevice) adapterView.getItemAtPosition(i);
+                startSplashActivity(device);
+            }
+        });
+
         final SwipeRefreshLayout swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swiperefresh);
         swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
                                       @Override
@@ -75,10 +82,10 @@ public class ScanActivity extends AppCompatActivity {
                                           else {
                                               swipeRefresh.setRefreshing(false);
                                           }
-
                                       }
                                   }
         );
+
         // Use this check to determine whether BLE is supported on the device. Then
         // you can selectively disable BLE-related features.
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
@@ -138,7 +145,7 @@ public class ScanActivity extends AppCompatActivity {
 
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_BLUETOOTH_ADMIN: {
                 // If request is cancelled, the result arrays are empty.
@@ -181,13 +188,27 @@ public class ScanActivity extends AppCompatActivity {
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            Toast.makeText(this, "Wat", Toast.LENGTH_LONG).show();
-            return true;
+        switch(id) {
+            case R.id.action_settings:
+                Toast.makeText(this, "Wat", Toast.LENGTH_LONG).show();
+                return true;
+            case R.id.menu_dev_buttons:
+                Toast.makeText(this, "You need to select a device.", Toast.LENGTH_LONG).show();
+                return true;
+            case R.id.menu_refresh:
+                refreshList();
+                return true;
+            default:
         }
 
+
         return super.onOptionsItemSelected(item);
+    }
+
+    private void startSplashActivity(BluetoothDevice device) {
+        Intent intent = new Intent(this, SplashPadActivity.class);
+        intent.putExtra(BLUETOOTH_DEVICE_EXTRA, device);
+        startActivity(intent);
     }
 
     private boolean attemptScan() {

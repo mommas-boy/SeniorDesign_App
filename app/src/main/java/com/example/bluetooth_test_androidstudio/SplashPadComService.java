@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Intent;
@@ -14,8 +15,10 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
 
+import java.lang.reflect.Array;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.UUID;
 
 // A service that interacts with the BLE device via the Android BLE API.
@@ -30,25 +33,51 @@ public class SplashPadComService extends Service {
     // Binder given to clients
     private final IBinder mBinder = new LocalBinder();
 
+    private int modeArray[] = new int[7];
+    private int durationArray[] = new int[7];
+    private Color colorArray[] = new Color[7];
+
     private int connectionState = STATE_DISCONNECTED;
+
+    private  BluetoothGattService nozzleService;
+    private  BluetoothGattCharacteristic nozzleCharacteristics[] = new BluetoothGattCharacteristic[7];
+
+    //private BluetoothGattCharacteristic nozzle0Characteristic;
+    //private BluetoothGattCharacteristic nozzle1Characteristic;
+    //private BluetoothGattCharacteristic nozzle2Characteristic;
+    //private BluetoothGattCharacteristic nozzle3Characteristic;
+    //private BluetoothGattCharacteristic nozzle4Characteristic;
+    //private BluetoothGattCharacteristic nozzle5Characteristic;
+    //private BluetoothGattCharacteristic nozzle6Characteristic;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
 
-    public final static String ACTION_GATT_CONNECTED =
-            "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
-    public final static String ACTION_GATT_DISCONNECTED =
-            "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
-    public final static String ACTION_GATT_SERVICES_DISCOVERED =
-            "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
-    public final static String ACTION_DATA_AVAILABLE =
-            "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
-    public final static String EXTRA_DATA =
-            "com.example.bluetooth.le.EXTRA_DATA";
+    public final static String ACTION_GATT_CONNECTED = "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
+    public final static String ACTION_GATT_DISCONNECTED = "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
+    public final static String ACTION_GATT_SERVICES_DISCOVERED = "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
+    public final static String ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
+    public final static String EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA";
+
+
+    public final static String NOZZLE_SERVICE_UUID = "0000babe-0000-1000-8000-00805f9b34fb";
+
+    public final static String NOZZLE_0_CHARACTERISTIC_UUID = "f000a0e0-0451-4000-b000-000000000000";
+    public final static String NOZZLE_1_CHARACTERISTIC_UUID = "f000a0e1-0451-4000-b000-000000000000";
+    public final static String NOZZLE_2_CHARACTERISTIC_UUID = "f000a0e2-0451-4000-b000-000000000000";
+    public final static String NOZZLE_3_CHARACTERISTIC_UUID = "f000a0e3-0451-4000-b000-000000000000";
+    public final static String NOZZLE_4_CHARACTERISTIC_UUID = "f000a0e4-0451-4000-b000-000000000000";
+    public final static String NOZZLE_5_CHARACTERISTIC_UUID = "f000a0e5-0451-4000-b000-000000000000";
+    public final static String NOZZLE_6_CHARACTERISTIC_UUID = "f000a0e6-0451-4000-b000-000000000000";
 
     //public final static UUID UUID_HEART_RATE_MEASUREMENT = UUID.fromString(SampleGattAttributes.HEART_RATE_MEASUREMENT);
 
+    public class Color {
+        public short red;
+        public short green;
+        public short blue;
+    }
 
 
     /**
@@ -63,19 +92,17 @@ public class SplashPadComService extends Service {
     }
 
     // Various callback methods defined by the BLE API.
-    private final BluetoothGattCallback gattCallback =
+    private final BluetoothGattCallback mGattCallback =
             new BluetoothGattCallback() {
                 @Override
-                public void onConnectionStateChange(BluetoothGatt gatt, int status,
-                                                    int newState) {
+                public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                     String intentAction;
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
                         intentAction = ACTION_GATT_CONNECTED;
                         connectionState = STATE_CONNECTED;
                         broadcastUpdate(intentAction);
                         Log.i(TAG, "Connected to GATT server.");
-                        Log.i(TAG, "Attempting to start service discovery:" +
-                                mBluetoothGatt.discoverServices());
+                        Log.i(TAG, "Attempting to start service discovery:" + mBluetoothGatt.discoverServices());
 
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                         intentAction = ACTION_GATT_DISCONNECTED;
@@ -90,6 +117,7 @@ public class SplashPadComService extends Service {
                 public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+                        initServices();
                     } else {
                         Log.w(TAG, "onServicesDiscovered received: " + status);
                     }
@@ -97,15 +125,12 @@ public class SplashPadComService extends Service {
 
                 @Override
                 // Result of a characteristic read operation
-                public void onCharacteristicRead(BluetoothGatt gatt,
-                                                 BluetoothGattCharacteristic characteristic,
-                                                 int status) {
+                public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
                     }
                 }
             };
-
 
     @Override
     public void onCreate() {
@@ -114,7 +139,12 @@ public class SplashPadComService extends Service {
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
-    @Nullable
+    @Override
+    public  void onDestroy() {
+        close();
+    }
+
+
     @Override
     public IBinder onBind(Intent intent) {
 
@@ -122,13 +152,40 @@ public class SplashPadComService extends Service {
         return mBinder;
     }
 
-
     public boolean connectToDevice(BluetoothDevice device) {
         mBluetoothDevice = device;
-        mBluetoothGatt = device.connectGatt(this, true, gattCallback);
+        mBluetoothGatt = device.connectGatt(this, true, mGattCallback);
 
 
         return mBluetoothGatt != null;
+    }
+
+    public void turnOnNozzle(int pos) {
+        modeArray[pos] = 0x00000001;
+        writeNozzle(pos);
+    }
+
+    public void turnOffNozzle(int pos) {
+
+    }
+
+    private void writeNozzle(int pos) {
+        //nozzleCharacteristics[pos];
+        ByteBuffer bb = ByteBuffer.allocate(14);
+        bb.putInt(modeArray[pos]);
+        bb.putInt(durationArray[pos]);
+        bb.putShort(colorArray[pos].red);
+        bb.putShort(colorArray[pos].green);
+        bb.putShort(colorArray[pos].blue);
+
+        byte[] bytes = bb.array();
+
+        for (int i = 0; i < 14; i++) {
+            Log.d("TEST ", "Byte " + i + " is " + bytes[i] );
+        }
+
+        nozzleCharacteristics[pos].setValue(bytes);
+        mBluetoothGatt.writeCharacteristic(nozzleCharacteristics[pos]);
     }
 
 
@@ -137,8 +194,55 @@ public class SplashPadComService extends Service {
         sendBroadcast(intent);
     }
 
-    private void broadcastUpdate(final String action,
-                                 final BluetoothGattCharacteristic characteristic) {
+    private void close() {
+        if (mBluetoothGatt == null) {
+            return;
+        }
+        mBluetoothGatt.close();
+        mBluetoothGatt = null;
+    }
+
+    private void initServices() {
+        List<BluetoothGattService> services =  mBluetoothGatt.getServices();
+        if(services == null){
+            return;
+        }
+        for (BluetoothGattService service : services) {
+            if(service.getUuid().equals(UUID.fromString(NOZZLE_SERVICE_UUID))) {
+                nozzleService = service;
+            }
+        }
+        initNozzleCharacteristics();
+    }
+
+    private void initNozzleCharacteristics() {
+        if(nozzleService == null) {
+            return;
+        }
+        List<BluetoothGattCharacteristic> characteristics = nozzleService.getCharacteristics();
+        if(characteristics == null) {
+            return;
+        }
+        for(BluetoothGattCharacteristic characteristic : characteristics) {
+            if(        characteristic.getUuid().equals(UUID.fromString(NOZZLE_0_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[0] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_1_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[1] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_2_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[2] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_3_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[3] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_4_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[4] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_5_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[5] = characteristic;
+            } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_6_CHARACTERISTIC_UUID))) {
+                nozzleCharacteristics[6] = characteristic;
+            }
+        }
+    }
+
+    private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
 
         // This is special handling for the Heart Rate Measurement profile. Data
