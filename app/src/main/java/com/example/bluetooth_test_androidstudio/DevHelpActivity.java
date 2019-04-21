@@ -22,7 +22,15 @@ public class DevHelpActivity extends Activity {
 
     private Button allOnButton;
     private Button centerOnlyButton;
+    private Button rainbowButton;
+    private Button toggleCenterButton;
+    private Button allWhiteButton;
+    private Button allColorsOffButton;
+    private Button jiggleBluetoothButton;
 
+    public Button getCenterOnlyButton() {
+        return centerOnlyButton;
+    }
 
     private ServiceConnection connection = new ServiceConnection() {
 
@@ -32,6 +40,7 @@ public class DevHelpActivity extends Activity {
             // We've bound to LocalService, cast the IBinder and get LocalService instance
             SplashPadComService.LocalBinder binder = (SplashPadComService.LocalBinder) service;
             mService = binder.getService();
+            mService.connectToDevice(mDevice);
             mBound = true;
         }
 
@@ -50,6 +59,10 @@ public class DevHelpActivity extends Activity {
 
         intent = new Intent(this, SplashPadComService.class);
         bindService(intent, connection, Context.BIND_AUTO_CREATE);
+
+        //mService.connectToDevice(mDevice);
+
+        initializeViews();
     }
 
     @Override
@@ -79,6 +92,12 @@ public class DevHelpActivity extends Activity {
     private void initializeViews() {
         allOnButton = findViewById(R.id.all_on_button);
         centerOnlyButton = findViewById(R.id.only_center_button);
+        rainbowButton = findViewById(R.id.rainbow_button);
+        toggleCenterButton = findViewById(R.id.toggle_center_button);
+        allWhiteButton = findViewById(R.id.all_white_button);
+        allColorsOffButton = findViewById(R.id.colors_off_button);
+        jiggleBluetoothButton = findViewById(R.id.jiggle_bluetooth_button);
+
 
         allOnButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -106,6 +125,70 @@ public class DevHelpActivity extends Activity {
             }
         });
 
+        rainbowButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(mService != null) {
+                    mService.setColor(0, 0x0FFF, 0x0000, 0x0000);
+                    mService.setColor(1, 0x0FFF, 0x0FFF, 0x0000);
+                    mService.setColor(2, 0x0000, 0x0FFF, 0x0000);
+                    mService.setColor(3, 0x0000, 0x0FFF, 0x0FFF);
+                    mService.setColor(4, 0x0000, 0x0000, 0x0FFF);
+                    mService.setColor(5, 0x0FFF, 0x0000, 0x0FFF);
+                    mService.setColor(6, 0x0FFF, 0x0FFF, 0x0FFF);
+                }
+            }
+        });
+
+        toggleCenterButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(mService != null) {
+                    int centerMode = mService.getNozzleMode(3);
+                    centerMode = centerMode ^ 0x0001;
+                    mService.setNozzleMode(3, centerMode);
+                }
+            }
+        });
+
+        allWhiteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(mService != null) {
+                    mService.setColor(0, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(1, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(2, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(3, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(4, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(5, 0x0FFF, 0x0FFF, 0x0FFF);
+                    mService.setColor(6, 0x0FFF, 0x0FFF, 0x0FFF);
+                }
+            }
+        });
+
+        allColorsOffButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(mService != null) {
+                    mService.setColor(0, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(1, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(2, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(3, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(4, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(5, 0x0000, 0x0000, 0x0000);
+                    mService.setColor(6, 0x0000, 0x0000, 0x0000);
+                }
+
+            }
+        });
+
+        jiggleBluetoothButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mService.setColor(3, 0x0000, 0x0000, 0x0000);
+                mService.setColor(3, 0x0FFF, 0x0FFF, 0x0FFF);
+            }
+        });
 
     }
 }

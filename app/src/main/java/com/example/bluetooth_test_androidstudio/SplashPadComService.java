@@ -7,17 +7,20 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
 
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,12 +33,17 @@ public class SplashPadComService extends Service {
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothDevice mBluetoothDevice;
     private BluetoothGatt mBluetoothGatt;
+    private BluetoothDevice connectedDevice = null;
     // Binder given to clients
     private final IBinder mBinder = new LocalBinder();
+    private BleQueue mBleQueue = new BleQueue();
+    private Handler mHandler = new Handler();
 
-    private int modeArray[] = new int[7];
-    private int durationArray[] = new int[7];
-    private Color colorArray[] = new Color[7];
+    private int[] modeArray = new int[7];
+    private int[] durationArray = new int[7];
+    private short[] redArray = new short[7];
+    private short[] greenArray = new short[7];
+    private short[] blueArray = new short[7];
 
     private int connectionState = STATE_DISCONNECTED;
 
@@ -73,11 +81,6 @@ public class SplashPadComService extends Service {
 
     //public final static UUID UUID_HEART_RATE_MEASUREMENT = UUID.fromString(SampleGattAttributes.HEART_RATE_MEASUREMENT);
 
-    public class Color {
-        public short red;
-        public short green;
-        public short blue;
-    }
 
 
     /**
@@ -88,6 +91,73 @@ public class SplashPadComService extends Service {
         SplashPadComService getService() {
             // Return this instance of LocalService so clients can call public methods
             return SplashPadComService.this;
+        }
+    }
+
+    private class BleQueue {
+        private boolean busy = false;
+        private int timeoutsInFlight = 0;
+        private LinkedList<Runnable> commandQueue = new LinkedList<>();
+        private final int BLE_TIMEOUT = 1000;
+
+        private void checkIfCanRun() {
+            if(busy) {
+                return;
+            }
+            runNext(); //safe to do only if not busy, which is checked previously.
+        }
+
+        public void notifyNoLongerBusy() {
+            busy = false;
+            checkIfCanRun();
+        }
+
+        private void runNext() {
+            if(busy) {
+                return;
+            }
+            if(!commandQueue.isEmpty()) {
+                Runnable run = commandQueue.pop();
+                if(run != null) {
+                    busy = true;
+                    run.run();
+                } else {
+                    Log.d(TAG, "Runnable was null. Wut? Synchronization issue?");
+                }
+                timeoutsInFlight = timeoutsInFlight + 1;
+                mHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        timeoutsInFlight = timeoutsInFlight - 1; //Because now that this one is running, we're not going to count it as "in flight"
+                        if(timeoutsInFlight < 1){
+                            busy = false;
+                            checkIfCanRun();
+                        }
+                    }
+                }, BLE_TIMEOUT);
+            }
+        }
+
+        public void addWrite(final BluetoothGattCharacteristic characteristic) {
+            Runnable runner = new Runnable() {
+                @Override
+                public void run() {
+                    mBluetoothGatt.writeCharacteristic(characteristic);
+                }
+            };
+            commandQueue.push(runner);
+            checkIfCanRun();
+        }
+
+        public void addRead(final BluetoothGattCharacteristic characteristic) {
+            Runnable runner = new Runnable() {
+                @Override
+                public void run() {
+                    mBluetoothGatt.readCharacteristic(characteristic);
+                }
+            };
+            commandQueue.push(runner);
+            checkIfCanRun();
         }
     }
 
@@ -129,8 +199,35 @@ public class SplashPadComService extends Service {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
                     }
+                    mBleQueue.notifyNoLongerBusy();
+                }
+
+                @Override
+                public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                    super.onCharacteristicWrite(gatt, characteristic, status);
+                    mBleQueue.notifyNoLongerBusy();
+                }
+
+                @Override
+                public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+                    super.onDescriptorRead(gatt, descriptor, status);
+                    mBleQueue.notifyNoLongerBusy();
+                }
+
+                @Override
+                public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+                    super.onDescriptorWrite(gatt, descriptor, status);
+                    mBleQueue.notifyNoLongerBusy();
+                }
+
+                @Override
+                public void onReliableWriteCompleted(BluetoothGatt gatt, int status) {
+                    super.onReliableWriteCompleted(gatt, status);
+                    mBleQueue.notifyNoLongerBusy();
                 }
             };
+
+
 
     @Override
     public void onCreate() {
@@ -147,12 +244,18 @@ public class SplashPadComService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-
-
         return mBinder;
     }
 
     public boolean connectToDevice(BluetoothDevice device) {
+        if(device != null) {
+            if(device.equals(connectedDevice) && connectionState == STATE_CONNECTED) {
+                return true;
+            }
+        } else {
+            return false;
+        }
+
         mBluetoothDevice = device;
         mBluetoothGatt = device.connectGatt(this, true, mGattCallback);
 
@@ -166,26 +269,55 @@ public class SplashPadComService extends Service {
     }
 
     public void turnOffNozzle(int pos) {
+        modeArray[pos] = 0x00000000;
+        writeNozzle(pos);
+    }
 
+    public void setColor(int pos, short red, short green, short blue) {
+        redArray[pos] = red;
+        greenArray[pos] = green;
+        blueArray[pos] = blue;
+
+        writeNozzle(pos);
+    }
+
+    public void setColor(int pos, int red, int green, int blue) {
+        redArray[pos] = (short) red;
+        greenArray[pos] = (short) green;
+        blueArray[pos] = (short) blue;
+
+        writeNozzle(pos);
+    }
+
+    public void setNozzleMode(int pos, int mode) {
+        modeArray[pos] = mode;
+        writeNozzle(pos);
+    }
+
+    public int getNozzleMode(int pos) {
+        if(nozzleCharacteristics[pos] != null) {
+            return nozzleCharacteristics[pos].getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32, 0);
+        }
+        return 0;
     }
 
     private void writeNozzle(int pos) {
+        if(nozzleCharacteristics[pos] == null) {
+            return;
+        }
         //nozzleCharacteristics[pos];
         ByteBuffer bb = ByteBuffer.allocate(14);
         bb.putInt(modeArray[pos]);
         bb.putInt(durationArray[pos]);
-        bb.putShort(colorArray[pos].red);
-        bb.putShort(colorArray[pos].green);
-        bb.putShort(colorArray[pos].blue);
+        bb.putShort(redArray[pos]);
+        bb.putShort(greenArray[pos]);
+        bb.putShort(blueArray[pos]);
 
         byte[] bytes = bb.array();
 
-        for (int i = 0; i < 14; i++) {
-            Log.d("TEST ", "Byte " + i + " is " + bytes[i] );
-        }
-
         nozzleCharacteristics[pos].setValue(bytes);
-        mBluetoothGatt.writeCharacteristic(nozzleCharacteristics[pos]);
+        mBleQueue.addWrite(nozzleCharacteristics[pos]);
+        //mBluetoothGatt.writeCharacteristic(nozzleCharacteristics[pos]);
     }
 
 
@@ -239,6 +371,8 @@ public class SplashPadComService extends Service {
             } else if (characteristic.getUuid().equals(UUID.fromString(NOZZLE_6_CHARACTERISTIC_UUID))) {
                 nozzleCharacteristics[6] = characteristic;
             }
+
+            mBleQueue.addRead(characteristic);
         }
     }
 
@@ -273,5 +407,6 @@ public class SplashPadComService extends Service {
         }
         sendBroadcast(intent);
     }
+
 
 }

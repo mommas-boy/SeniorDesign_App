@@ -30,6 +30,7 @@ public class SplashPadActivity extends Activity {
             // We've bound to LocalService, cast the IBinder and get LocalService instance
             SplashPadComService.LocalBinder binder = (SplashPadComService.LocalBinder) service;
             mService = binder.getService();
+            mService.connectToDevice(mDevice);
             mBound = true;
         }
 
@@ -48,6 +49,8 @@ public class SplashPadActivity extends Activity {
 
         intent = new Intent(this, SplashPadComService.class);
         bindService(intent, connection, Context.BIND_AUTO_CREATE);
+
+        //mService.connectToDevice(mDevice);
     }
 
     @Override
@@ -90,7 +93,7 @@ public class SplashPadActivity extends Activity {
                 Toast.makeText(this, "Wat", Toast.LENGTH_LONG).show();
                 return true;
             case R.id.menu_dev_buttons:
-                Intent intent = new Intent(this, SplashPadActivity.class);
+                Intent intent = new Intent(this, DevHelpActivity.class);
                 intent.putExtra(BLUETOOTH_DEVICE_EXTRA, mDevice);
                 startActivity(intent);
                 return true;
